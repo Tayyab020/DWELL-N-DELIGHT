@@ -1,0 +1,77 @@
+name: flutter_appp123
+description: A new Flutter project.
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=2.17.0 <3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  camera: ^0.11.0+2
+  cupertino_icons: ^1.0.2
+  carousel_slider: ^5.0.0
+  share_plus: ^10.1.4
+  geolocator: ^13.0.2
+  permission_handler: ^11.0.1
+  screenshot: ^2.1.0
+  image_picker: ^1.0.7
+  flutter_rating_bar: ^4.0.0
+  convex_bottom_bar: ^3.2.0
+  provider: ^6.0.5
+  flutter_dotenv: ^5.2.1
+  shared_preferences: ^2.5.3
+
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_launcher_icons: "^0.14.2"
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon/home.png"
+
+  # flutter_icons:
+  #   android: true
+  #   ios: true
+  #   image_path: "assets/icons/home.png"
+
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/icons/logo1.png
+    - assets/icons/lock.png
+    - assets/icons/cart.png
+    - assets/icons/person.png
+    - assets/icons/hello.png
+    - assets/icons/skip1.png
+    - assets/icons/google.png
+    - assets/icons/apple.png
+    - assets/icons/facebook.png
+    - assets/icons/biryani.png
+    - assets/icons/egg.png
+    - assets/icons/map1.png
+    - assets/icons/house1.png
+    - assets/icons/house2.png
+    - assets/icons/house4.jpg
+    - assets/icons/homeico.png
+    - assets/icons/chat.png
+    - assets/icons/search.png
+    - assets/icons/mic.png
+    - assets/icons/khana.png
+    - assets/icons/house3.png
+    - assets/icons/splash.png
+    - assets/icons/girl.jfif
+    - assets/icons/page2.png
+    - assets/icons/page1.webp
+    - assets/icons/s.png
+    - assets/icons/roti.jfif
+    - assets/icons/chvl.jfif
+    - assets/icons/landlord.jpg
+
