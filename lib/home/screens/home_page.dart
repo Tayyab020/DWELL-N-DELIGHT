@@ -1,13 +1,20 @@
+import 'dart:convert' show json, jsonDecode;
+
 import 'package:flutter/material.dart';
+import 'package:flutter_appp123/home/screens/ProviderOrdersScreen.dart';
 import 'package:flutter_appp123/home/screens/cart1.dart';
-import 'package:flutter_appp123/home/screens/notification.dart';
+import 'package:flutter_appp123/home/screens/fav.dart';
 import 'package:flutter_appp123/home/screens/fooddetails.dart';
+import 'package:flutter_appp123/home/screens/housedetails.dart';
+import 'package:flutter_appp123/home/screens/notification.dart';
+import 'package:flutter_appp123/home/screens/seeallfood.dart';
+import 'package:flutter_appp123/home/screens/seeallrentals.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+
 import '../widgets/sectionheader.dart';
 import '../widgets/menu.dart';
-import '../screens/fav.dart';
-import '../screens/housedetails.dart';
-import '../screens/seeallfood.dart';
-import '../screens/seeallrentals.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -38,6 +45,72 @@ class _HomePageState extends State<HomePage> {
     },
   ];
   double totalPrice = 0.0;
+  List<dynamic> blogs = [];
+  String? role;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchBlogs();
+    _loadUserRole();
+  }
+
+  Future<void> _loadUserRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userString = prefs.getString('user');
+    if (userString != null) {
+      final user = jsonDecode(userString);
+      setState(() {
+        role = user['role'];
+      });
+    }
+  }
+
+  Future<void> fetchBlogs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userString = prefs.getString('user');
+
+      if (userString == null) {
+        print('❌ No user data found in local storage');
+        return;
+      }
+      final user = jsonDecode(userString);
+      final userId = user['_id'];
+      setState(() {
+        role = user['role'];
+      });
+
+      print('User Role: $role');
+      print('User ID: $userId');
+
+      String backendUrl = dotenv.env['BACKEND_URL']!;
+      String endpoint = (role == 'provider')
+          ? '$backendUrl/blogs/author/$userId'
+          : '$backendUrl/blog/all';
+
+      final response = await http.get(
+        Uri.parse(endpoint),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      );
+      print('📡 Response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('✅ Blogs fetched: $data');
+
+        setState(() {
+          blogs = data['blogs'] ?? [];
+        });
+      } else {
+        print('❌ Failed with status: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Error fetching blogs: $e');
+    }
+  }
 
   void addToFavorites(Map<String, dynamic> item) {
     setState(() {
@@ -61,6 +134,7 @@ class _HomePageState extends State<HomePage> {
       context,
       MaterialPageRoute(
         builder: (context) => FoodDetailPage(
+          itemId: item['itemId'],
           imageUrl: item['imageUrl'],
           title: item['title'],
           description: item['description'],
@@ -139,22 +213,32 @@ class _HomePageState extends State<HomePage> {
             Padding(
               padding: const EdgeInsets.only(top: 20.0),
               child: IconButton(
-                icon: const Icon(Icons.shopping_cart_outlined,
-                    color: Color(0xFFE65100)),
+                icon: Icon(  role == 'provider'
+                        ? Icons.list_alt_outlined
+                        : Icons.shopping_cart_outlined,
+                    color: const Color(0xFFE65100)),
                 onPressed: () async {
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          const CartPage(), // ✅ No parameters needed
-                    ),
-                  );
-
-                  if (result != null) {
-                    setState(() {
-                      cartItems = result['cartItems'];
-                      totalPrice = result['totalPrice'];
-                    });
+                  if (role == 'provider') {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const ProviderOrdersScreen()),
+                    );
+                  } else if (role == 'buyer') {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => CartPage(
+                                cartItems: cartItems,
+                                totalPrice: totalPrice,
+                              )),
+                    );
+                    if (result != null) {
+                      setState(() {
+                        cartItems = result['cartItems'];
+                        totalPrice = result['totalPrice'];
+                      });
+                    }
                   }
                 },
               ),
@@ -218,93 +302,40 @@ class _HomePageState extends State<HomePage> {
                                 builder: (context) => AllFoodsPage()),
                           );
                         },
-                      ), // <-- Properly closed
-
+                      ),
                       SizedBox(
                         height: 180,
                         child: ListView(
                           scrollDirection: Axis.horizontal,
-                          children: [
-                            GestureDetector(
-                              onTap: () => navigateToFoodDetail({
-                                'imageUrl': 'assets/icons/biryani.png',
-                                'title': 'Biryani',
-                                'description':
-                                    'A delicious blend of spices, rice, and chicken.',
-                                'price': 300.0,
-                              }),
-                              child: MenuCard(
-                                imageUrl: 'assets/icons/biryani.png',
-                                title: 'Biryani',
-                                description:
-                                    'A delicious blend of spices, rice, and chicken.',
-                                type: 'food',
-                                price: 300.0,
-                                addToCart: addToCart,
-                                addToFavorites: addToFavorites,
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () => navigateToFoodDetail({
-                                'imageUrl': 'assets/icons/egg.png',
-                                'title': 'Egg Curry',
-                                'description':
-                                    'A delicious curry made with boiled eggs in a spiced gravy.',
-                                'price': 400.0,
-                              }),
-                              child: MenuCard(
-                                imageUrl: 'assets/icons/egg.png',
-                                title: 'Egg Curry',
-                                description:
-                                    'A delicious curry made with boiled eggs in a spiced gravy.',
-                                type: 'food',
-                                price: 400.0,
-                                addToCart: addToCart,
-                                addToFavorites: addToFavorites,
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () => navigateToFoodDetail({
-                                'imageUrl': 'assets/icons/roti.jfif',
-                                'title': 'Daal Roti',
-                                'description':
-                                    'The daal is made with a blend of lentils, aromatic spices, and a tempering of ghee, garlic, and cumin, offering a perfect balance of taste and nutrition.',
-                                'price': 200.0,
-                              }),
-                              child: MenuCard(
-                                imageUrl: 'assets/icons/roti.jfif',
-                                title: 'Daal Roti',
-                                description:
-                                    'The daal is made with a blend of lentils, aromatic spices, and a tempering of ghee, garlic, and cumin, offering a perfect balance of taste and nutrition.',
-                                type: 'food',
-                                price: 200.0,
-                                addToCart: addToCart,
-                                addToFavorites: addToFavorites,
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () => navigateToFoodDetail({
-                                'imageUrl': 'assets/icons/chvl.jfif',
-                                'title': 'Daal Chawal',
-                                'description':
-                                    'The daal is made with a blend of lentils, aromatic spices, and a tempering of ghee, garlic, and cumin, offering a perfect balance of taste and nutrition.',
-                                'price': 250.0,
-                              }),
-                              child: MenuCard(
-                                imageUrl: 'assets/icons/chvl.jfif',
-                                title: 'Daal Chawal',
-                                description:
-                                    'The daal is made with a blend of lentils, aromatic spices, and a tempering of ghee, garlic, and cumin, offering a perfect balance of taste and nutrition.',
-                                type: 'food',
-                                price: 250.0,
-                                addToCart: addToCart,
-                                addToFavorites: addToFavorites,
-                              ),
-                            ),
-                          ],
+                          children: blogs.isNotEmpty
+                              ? blogs
+                                  .where((blog) => blog['type'] == 'food')
+                                  .map((blog) {
+                                  final price = blog['price'];
+                                  return GestureDetector(
+                                    onTap: () => navigateToFoodDetail({
+                                      'itemId': blog['_id'],
+                                      'imageUrl': blog['photoPath'],
+                                      'title': blog['title'],
+                                      'description': blog['content'],
+                                      'price':
+                                          price is num ? price.toDouble() : 0.0,
+                                    }),
+                                    child: MenuCard(
+                                      imageUrl: blog['photoPath'],
+                                      title: blog['title'],
+                                      description: blog['content'],
+                                      type: 'food',
+                                      price:
+                                          price is num ? price.toDouble() : 0.0,
+                                      addToCart: addToCart,
+                                      addToFavorites: addToFavorites,
+                                    ),
+                                  );
+                                }).toList()
+                              : [],
                         ),
                       ),
-
                       const SizedBox(height: 20),
                       SectionHeader(
                         title: "Explore Rentals",
@@ -318,117 +349,44 @@ class _HomePageState extends State<HomePage> {
                           );
                         },
                       ),
-
                       SizedBox(
                         height: 180,
                         child: ListView(
                           scrollDirection: Axis.horizontal,
-                          children: [
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => HouseDetailPage(
-                                      imageUrl: 'assets/icons/house1.png',
-                                      title: 'Luxury Villa',
-                                      description:
-                                          'A beautiful luxury villa with 4 bedrooms and a pool.',
-                                      price: 5000.0,
+                          children: blogs.isNotEmpty
+                              ? blogs
+                                  .where((blog) => blog['type'] == 'rental')
+                                  .map((blog) {
+                                  final price = blog['price'];
+                                  return GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => HouseDetailPage(
+                                            imageUrl: blog['photoPath'] ?? '',
+                                            title: blog['title'] ?? '',
+                                            description: blog['content'] ?? '',
+                                            price: (blog['price'] is num)
+                                                ? blog['price'].toDouble()
+                                                : 0.0,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    child: MenuCard(
+                                      imageUrl: blog['photoPath'],
+                                      title: blog['title'],
+                                      description: blog['content'],
+                                      type: 'rental',
+                                      price:
+                                          price is num ? price.toDouble() : 0.0,
+                                      addToCart: addToCart,
+                                      addToFavorites: addToFavorites,
                                     ),
-                                  ),
-                                );
-                              },
-                              child: MenuCard(
-                                imageUrl: 'assets/icons/house1.png',
-                                title: 'Luxury Villa',
-                                description:
-                                    'A beautiful luxury villa with 4 bedrooms and a pool.',
-                                type: 'house',
-                                price: 5000.0,
-                                addToCart: addToCart,
-                                addToFavorites: addToFavorites,
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => HouseDetailPage(
-                                      imageUrl: 'assets/icons/house2.png',
-                                      title: 'House',
-                                      description:
-                                          'A luxury house with 2 bedrooms and a kitchen.',
-                                      price: 4000.0,
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: MenuCard(
-                                imageUrl: 'assets/icons/house2.png',
-                                title: 'House',
-                                description:
-                                    'A luxury house with 2 bedrooms and a kitchen.',
-                                type: 'house',
-                                price: 4000.0,
-                                addToCart: addToCart,
-                                addToFavorites: addToFavorites,
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => HouseDetailPage(
-                                      imageUrl: 'assets/icons/house3.png',
-                                      title: 'City House',
-                                      description:
-                                          'A beautiful house with 3 bedrooms,kitchen and  a pool.',
-                                      price: 4000.0,
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: MenuCard(
-                                imageUrl: 'assets/icons/house3.png',
-                                title: 'City house',
-                                description:
-                                    'A beautiful house with 3 bedrooms,kitchen and  a pool',
-                                type: 'house',
-                                price: 4000.0,
-                                addToCart: addToCart,
-                                addToFavorites: addToFavorites,
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => HouseDetailPage(
-                                      imageUrl: 'assets/icons/house4.jpg',
-                                      title: 'Desi House',
-                                      description:
-                                          'A beautiful village house with 4 bedrooms,kitchen,washrooms and  a garden area.',
-                                      price: 7000.0,
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: MenuCard(
-                                imageUrl: 'assets/icons/house4.jpg',
-                                title: 'Desi House',
-                                description:
-                                    'A beautiful village house with 4 bedrooms,kitchen,washrooms and  a garden area.',
-                                type: 'house',
-                                price: 7000.0,
-                                addToCart: addToCart,
-                                addToFavorites: addToFavorites,
-                              ),
-                            ),
-                          ],
+                                  );
+                                }).toList()
+                              : [],
                         ),
                       ),
                     ],

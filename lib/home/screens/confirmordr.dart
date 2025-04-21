@@ -3,12 +3,13 @@ import 'package:flutter_appp123/home/screens/paymentmethod.dart'; // Import paym
 
 class PaymentPage extends StatelessWidget {
   final String orderTitle;
-  final double orderPrice;
+  final  orderPrice;
   final String orderDetails;
   final String userName; // Updated to match the previous page
   final String userLocation;
   final String userPhone;
   final String alternatePhone;
+  final String itemId; // Added itemId for future use
 
   const PaymentPage({
     super.key,
@@ -19,6 +20,7 @@ class PaymentPage extends StatelessWidget {
     required this.userLocation,
     required this.userPhone,
     required this.alternatePhone,
+    required this.itemId,
   });
 
   @override
@@ -154,10 +156,35 @@ class PaymentPage extends StatelessWidget {
             const SizedBox(height: 40),
             ElevatedButton.icon(
               onPressed: () {
+                //  Navigator.push(
+                //   context,
+                //   MaterialPageRoute(
+                //     builder: (context) => PaymentPage(
+                //       itemId: widget.itemId,
+                //       orderTitle: widget.orderTitle,
+                //       orderPrice: widget.orderPrice,
+                //       orderDetails: widget.orderDetails,
+                //       userName: name,
+                //       userLocation: location,
+                //       userPhone: phone,
+                //       alternatePhone: alternatePhone,
+                //     ),
+                //   ),
+                // );
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => PaymentMethodsPage(),
+                    builder: (context) => PaymentMethodsPage(
+                      orderTitle: orderTitle,
+                      orderPrice: orderPrice,
+                      orderDetails: orderDetails,
+                      userName: userName,
+                      userLocation: userLocation,
+                      userPhone: userPhone,
+                      alternatePhone: alternatePhone,
+                      itemId: itemId, // Pass itemId to the payment method page
+
+                    ),
                   ),
                 );
               },

@@ -1,17 +1,24 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class EditProfilePage extends StatefulWidget {
   final String name;
   final String contact;
   final String email;
+  final String? profileImage;
 
   const EditProfilePage({
     super.key,
     required this.name,
     required this.contact,
     required this.email,
+    this.profileImage,
   });
 
   @override
@@ -23,6 +30,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   late TextEditingController _contactController;
   late TextEditingController _emailController;
   File? _imageFile;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -43,7 +51,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   Future<void> _pickImage() async {
     final pickedFile =
         await ImagePicker().pickImage(source: ImageSource.gallery);
-
     if (pickedFile != null) {
       setState(() {
         _imageFile = File(pickedFile.path);
@@ -51,137 +58,274 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-  // Placeholder for image upload logic
-  Future<void> _uploadImage() async {
-    if (_imageFile != null) {
-      // Implement your image upload logic here, for example using Firebase or an HTTP API
-      // Example: await FirebaseStorage.instance.ref('user_profiles').child('profile.jpg').putFile(_imageFile!);
-      print("Image uploaded: ${_imageFile!.path}");
+  Future<String?> _uploadImage() async {
+    if (_imageFile == null) return null;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userString = prefs.getString('user');
+      if (userString == null) return null;
+
+      final userMap = json.decode(userString);
+      final userId = userMap['_id'];
+      String backendUrl = dotenv.env['BACKEND_URL'] ?? "";
+
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$backendUrl/updateProfileImage/$userId'),
+      );
+
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'profileImage',
+          _imageFile!.path,
+        ),
+      );
+
+      var response = await request.send();
+      if (response.statusCode == 200) {
+        final responseData = await response.stream.bytesToString();
+        final jsonData = jsonDecode(responseData);
+        return jsonData['user']['profileImage'];
+      }
+      return null;
+    } catch (e) {
+      print("Error uploading image: $e");
+      return null;
     }
   }
 
-  void _saveProfile() {
-    String updatedName = _nameController.text;
-    String updatedContact = _contactController.text;
-    String updatedEmail = _emailController.text;
+  Future<bool> _updateUserData(String? newImageUrl) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userString = prefs.getString('user');
+      if (userString == null) return false;
 
-    // Pass updated data back
-    Navigator.pop(context, {
-      'name': updatedName,
-      'contact': updatedContact,
-      'email': updatedEmail,
-      'image': _imageFile,
-    });
+      final userMap = json.decode(userString);
+      final userId = userMap['_id'];
+      String backendUrl = dotenv.env['BACKEND_URL'] ?? "";
 
-    // Show success message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Profile Updated!")),
-    );
+      final response = await http.put(
+        Uri.parse('$backendUrl/users/$userId'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'name': _nameController.text,
+          'phone': _contactController.text,
+          'email': _emailController.text,
+          'profileImage': newImageUrl ?? widget.profileImage,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        // Update local storage
+        final updatedUser = json.decode(response.body);
+        await prefs.setString('user', json.encode(updatedUser));
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print("Error updating user data: $e");
+      return false;
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    setState(() => _isLoading = true);
+
+    try {
+      String? newImageUrl;
+      if (_imageFile != null) {
+        newImageUrl = await _uploadImage();
+      }
+
+      final success = await _updateUserData(newImageUrl);
+
+      if (success) {
+        Navigator.pop(context, {
+          'name': _nameController.text,
+          'contact': _contactController.text,
+          'email': _emailController.text,
+          'image': _imageFile,
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Profile updated successfully!")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to update profile")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: ${e.toString()}")),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    print("Profile image URL: ${widget.profileImage}");
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = Color(0xFFE65100);
+    final cardColor = isDark ? Colors.grey[800] : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.grey[800];
+
     return Scaffold(
       appBar: AppBar(
         title:
             const Text("Edit Profile", style: TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFFE65100),
+        backgroundColor: primaryColor,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              // Profile Picture Section
-              Center(
-                child: Stack(
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator(color: primaryColor))
+          : SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
                   children: [
-                    CircleAvatar(
-                      radius: 60,
-                      backgroundImage: _imageFile != null
-                          ? FileImage(_imageFile!)
-                          : const AssetImage('assets/icons/landlord.jpg')
-                              as ImageProvider,
+                    // Profile Picture Section
+                    Center(
+                      child: Stack(
+                        children: [
+                        CircleAvatar(
+                            radius: 60,
+                            backgroundColor: Colors.grey[200],
+                           backgroundImage: _imageFile != null
+                                ? FileImage(_imageFile!) as ImageProvider<
+                                    Object>? // Cast the FileImage to ImageProvider<Object> explicitly
+                                : (widget.profileImage != null &&
+                                        widget.profileImage!.isNotEmpty &&
+                                        widget.profileImage != "null")
+                                    ? NetworkImage(widget
+                                        .profileImage!) // For network image
+                                    : null, // If no image, null backgroundImage
+
+                          ),
+
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: primaryColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: cardColor!,
+                                  width: 2,
+                                ),
+                              ),
+                              child: IconButton(
+                                icon: const Icon(Icons.edit,
+                                    color: Colors.white, size: 18),
+                                onPressed: _pickImage,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: CircleAvatar(
-                        backgroundColor: Colors.orange.shade900,
-                        radius: 18,
-                        child: IconButton(
-                          icon: const Icon(Icons.edit,
-                              color: Colors.white, size: 18),
-                          onPressed: () {
-                            _pickImage();
-                            _uploadImage(); // Call upload after picking an image
-                          },
+                    const SizedBox(height: 24),
+
+                    // Name Field
+                    TextField(
+                      controller: _nameController,
+                      decoration: InputDecoration(
+                        labelText: "Name",
+                        labelStyle:
+                            TextStyle(color: textColor!.withOpacity(0.8)),
+                        prefixIcon: Icon(Icons.person, color: primaryColor),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[400]!),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[400]!),
+                        ),
+                        filled: true,
+                        fillColor: cardColor,
+                      ),
+                      style: TextStyle(color: textColor),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Contact Field
+                    TextField(
+                      controller: _contactController,
+                      decoration: InputDecoration(
+                        labelText: "Contact",
+                        labelStyle:
+                            TextStyle(color: textColor?.withOpacity(0.8)),
+                        prefixIcon: Icon(Icons.phone, color: primaryColor),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[400]!),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[400]!),
+                        ),
+                        filled: true,
+                        fillColor: cardColor,
+                      ),
+                      style: TextStyle(color: textColor),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Email Field
+                    TextField(
+                      controller: _emailController,
+                      decoration: InputDecoration(
+                        labelText: "Email",
+                        labelStyle:
+                            TextStyle(color: textColor!.withOpacity(0.8)),
+                        prefixIcon: Icon(Icons.email, color: primaryColor),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[400]!),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[400]!),
+                        ),
+                        filled: true,
+                        fillColor: cardColor,
+                      ),
+                      style: TextStyle(color: textColor),
+                    ),
+                    const SizedBox(height: 32),
+
+                    // Save Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _saveProfile,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          elevation: 2,
+                        ),
+                        child: const Text(
+                          "Save Changes",
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-
-              // Name Field
-              TextField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: "Name",
-                  prefixIcon:
-                      const Icon(Icons.person, color: Colors.deepOrange),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 15),
-
-              // Contact Field
-              TextField(
-                controller: _contactController,
-                decoration: InputDecoration(
-                  labelText: "Contact",
-                  prefixIcon: const Icon(Icons.phone, color: Colors.deepOrange),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 15),
-
-              // Email Field
-              TextField(
-                controller: _emailController,
-                decoration: InputDecoration(
-                  labelText: "Email",
-                  prefixIcon: const Icon(Icons.email, color: Colors.deepOrange),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 30),
-
-              // Save Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _saveProfile,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange.shade900,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    elevation: 5,
-                  ),
-                  child: const Text("Save Changes",
-                      style: TextStyle(fontSize: 16, color: Colors.white)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 }

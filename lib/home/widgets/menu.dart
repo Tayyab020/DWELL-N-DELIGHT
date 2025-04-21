@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 
-class MenuCard extends StatelessWidget {
+class MenuCard extends StatefulWidget {
   final String imageUrl;
   final String title;
   final String description;
@@ -21,11 +22,37 @@ class MenuCard extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<MenuCard> createState() => _MenuCardState();
+}
+
+class _MenuCardState extends State<MenuCard> {
+  VideoPlayerController? _videoController;
+  bool isVideo = false;
+
+  @override
+  void initState() {
+    super.initState();
+    isVideo = widget.imageUrl.toLowerCase().endsWith(".mp4");
+    if (isVideo) {
+      _videoController = VideoPlayerController.network(widget.imageUrl)
+        ..initialize().then((_) {
+          setState(() {});
+        });
+    }
+  }
+
+  @override
+  void dispose() {
+    _videoController?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(right: 20),
       width: 200,
-      height: 200, // Added fixed height to container
+      height: 200,
       child: Card(
         color: Colors.white,
         elevation: 4,
@@ -36,62 +63,64 @@ class MenuCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
-              // Changed to SizedBox for strict height control
-              height: 70, // Reduced image height
+              height: 70,
               width: double.infinity,
               child: ClipRRect(
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(20)),
-                child: Image.asset(
-                  imageUrl,
-                  fit: BoxFit.contain,
-                ),
+                child: isVideo
+                    ? Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          if (_videoController != null &&
+                              _videoController!.value.isInitialized)
+                            VideoPlayer(_videoController!)
+                          else
+                            const Center(child: CircularProgressIndicator()),
+                          const Center(
+                            child: Icon(Icons.play_circle_fill,
+                                size: 30, color: Colors.white),
+                          ),
+                        ],
+                      )
+                    : Image.network(
+                        widget.imageUrl,
+                        fit: BoxFit.cover,
+                      ),
               ),
             ),
             Expanded(
-              // Wrapped content in Expanded
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      title,
+                      widget.title,
                       style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14, // Reduced font size
-                      ),
+                          fontWeight: FontWeight.bold, fontSize: 14),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2), // Reduced spacing
+                    const SizedBox(height: 2),
                     Text(
-                      description,
-                      style: TextStyle(
-                        fontSize: 11, // Reduced font size
-                        color: Colors.grey[600],
-                      ),
+                      widget.description,
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    // Added spacer
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '₹${price.toStringAsFixed(2)}',
+                          '₹${widget.price.toStringAsFixed(2)}',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Color(0xFFE65100),
-                            fontSize: 13, // Reduced font size
+                            fontSize: 13,
                           ),
                         ),
-                        Row(
-                          children: [
-                            const SizedBox(width: 8),
-                          ],
-                        ),
+                        const SizedBox(width: 8),
                       ],
                     ),
                   ],

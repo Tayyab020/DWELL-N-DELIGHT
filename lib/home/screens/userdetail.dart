@@ -6,12 +6,14 @@ class UserDetailsPage extends StatefulWidget {
   final String orderTitle;
   final double orderPrice;
   final String orderDetails;
+  final String itemId;
 
   const UserDetailsPage({
     super.key,
     required this.orderTitle,
     required this.orderPrice,
     required this.orderDetails,
+    required this.itemId,
   });
 
   @override
@@ -46,6 +48,7 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
       context,
       MaterialPageRoute(
         builder: (context) => PaymentPage(
+          itemId: widget.itemId,
           orderTitle: widget.orderTitle,
           orderPrice: widget.orderPrice,
           orderDetails: widget.orderDetails,

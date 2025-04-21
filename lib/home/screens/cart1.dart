@@ -4,7 +4,7 @@ import 'cartprovider.dart';
 import 'order.dart';
 
 class CartPage extends StatelessWidget {
-  const CartPage({super.key});
+  const CartPage({super.key, required List<Map<String, dynamic>> cartItems, required double totalPrice});
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +43,7 @@ class CartPage extends StatelessWidget {
                         child: ListTile(
                           leading: ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: Image.asset(
+                            child: Image.network(
                               item['imageUrl'], // Ensure correct key
                               width: 60,
                               height: 60,
@@ -113,14 +113,21 @@ class CartPage extends StatelessWidget {
                           onPressed: cartProvider.cartItems.isEmpty
                               ? null
                               : () {
+                                  // Assuming that the first item is selected for the order
+                                  final selectedItem =
+                                      cartProvider.cartItems.first;
+                                  final itemId = selectedItem[
+                                      '_id']; // Adjust this key based on your item structure
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (context) => OrderPage(
                                         title: "Your Order",
                                         price: cartProvider.totalPrice,
-                                        imageUrl: cartProvider.cartItems
-                                            .first['imageUrl'], // Correct key
+                                        imageUrl: selectedItem[
+                                            'imageUrl'], // Correct key
+                                        itemId:
+                                            itemId, // Pass the itemId to the OrderPage
                                       ),
                                     ),
                                   );

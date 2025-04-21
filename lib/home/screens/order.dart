@@ -5,12 +5,14 @@ class OrderPage extends StatefulWidget {
   final String title;
   final double price;
   final String imageUrl;
+  final String itemId;
 
   const OrderPage({
     super.key,
     required this.title,
     required this.price,
     required this.imageUrl,
+    required this.itemId,
   });
 
   @override
@@ -40,7 +42,7 @@ class _OrderPageState extends State<OrderPage> {
             Center(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.asset(
+                child: Image.network(
                   widget.imageUrl,
                   height: 200,
                   width: 200,
@@ -89,6 +91,7 @@ class _OrderPageState extends State<OrderPage> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => UserDetailsPage(
+                        itemId: widget.itemId,
                         orderTitle: widget.title,
                         orderPrice: widget.price,
                         orderDetails: customOrderDetails.isEmpty
