@@ -119,8 +119,8 @@ Future<void> createOrder(BuildContext context, String paymentMethod) async {
         child: Column(
           children: [
             const SizedBox(height: 20),
-            _buildPaymentMethod(context, Icons.account_balance_wallet,
-                "JazzCash / Easypaisa", true),
+            // _buildPaymentMethod(context, Icons.account_balance_wallet,
+            //     "JazzCash / Easypaisa", true),
             const SizedBox(height: 10),
             _buildPaymentMethod(
                 context, Icons.money, "Cash on Delivery", false),
