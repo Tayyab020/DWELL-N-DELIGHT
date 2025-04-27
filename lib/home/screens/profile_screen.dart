@@ -391,13 +391,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          "Real Estate Agent",
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white.withOpacity(0.9),
-                          ),
-                        ),
+                        // Text(
+                        //   "Real Estate Agent",
+                        //   style: TextStyle(
+                        //     fontSize: 16,
+                        //     color: Colors.white.withOpacity(0.9),
+                        //   ),
+                        // ),
                       ],
                     ),
                   ),

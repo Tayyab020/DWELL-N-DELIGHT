@@ -424,7 +424,9 @@ class _HomePageState extends State<HomePage> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (context) => AllFoodsPage()),
+                                builder: (context) => AllFoodsPage(
+                                    onPostDeleted: refreshPosts,
+                                )),
                           );
                         },
                       ),
@@ -469,7 +471,9 @@ class _HomePageState extends State<HomePage> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => AllRentalsPage(),
+                              builder: (context) => AllRentalsPage(
+                                  onPostDeleted: refreshPosts, 
+                              ),
                             ),
                           );
                         },

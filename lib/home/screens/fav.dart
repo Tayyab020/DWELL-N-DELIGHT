@@ -60,19 +60,23 @@ class _FavoritesPageState extends State<FavoritesPage> {
         final data = json.decode(response.body);
         print('print printttttttttttttttt➡️');
         print(data);
-        setState(() {
+       setState(() {
           favoritesList = List<Map<String, dynamic>>.from(
-            (data as List).map((item) => {
-                  "id": item['_id'],
-                  "title": item['itemId']?['title'] ?? 'No Title',
-                  "description": item['itemId']?['content'] ?? '',
-                  "image": item['itemId']?['photoPath'],
-                  "price": item['itemId']?['price'] ?? 0,
-                  "isBlocked": item['itemId']?['isBlocked'] ?? false,
-                }),
+            (data as List).map((item) {
+              final itemId = item['itemId'];
+              return {
+                "id": itemId?['_id'] ?? '',
+                "title": itemId?['title'] ?? 'No Title',
+                "description": itemId?['content'] ?? '',
+                "image": itemId?['photoPath'],
+                "price": itemId?['price'] ?? 0,
+                "isBlocked": itemId?['isBlocked'] ?? false,
+              };
+            }),
           );
           isLoading = false;
         });
+
       } else {
         throw Exception('Failed to load favorites');
       }
@@ -148,7 +152,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                           final favorite = favoritesList[index];
 
                           print(
-                              '❤️favoritefavoritefavoritefavoritefavoritefavoritefavoritefavoritefavoritefavoritefavoritefavorite');
+                              '❤️  fave');
                           print(favorite);
                           return GestureDetector(
                             onTap: () {

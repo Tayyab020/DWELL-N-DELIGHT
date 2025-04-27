@@ -39,6 +39,7 @@ class FoodDetailPage extends StatefulWidget {
 class _FoodDetailPageState extends State<FoodDetailPage> {
   bool isLiked = false;
   bool isLoadingLikeStatus = true;
+  bool isProvider = false; 
 
   double rating = 0;
   int quantity = 1;
@@ -93,6 +94,19 @@ class _FoodDetailPageState extends State<FoodDetailPage> {
 
     // Initialize favorite status
     checkIfLiked();
+    
+    _checkUserRole(); 
+  }
+   Future<void> _checkUserRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userString = prefs.getString('user');
+
+    if (userString != null) {
+      final user = jsonDecode(userString);
+      setState(() {
+        isProvider = user['role'] == 'provider';
+      });
+    }
   }
 
   Future<void> checkIfLiked() async {
@@ -379,42 +393,47 @@ class _FoodDetailPageState extends State<FoodDetailPage> {
                         color: Colors.green),
                   ),
                   const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      IconButton(
-                        onPressed: () {
-                          setState(() {
-                            if (quantity > 1) quantity--;
-                          });
-                        },
-                        icon:
-                            const Icon(Icons.remove_circle, color: Colors.red),
-                      ),
-                      Text('$quantity', style: const TextStyle(fontSize: 18)),
-                      IconButton(
-                        onPressed: () {
-                          setState(() {
-                            quantity++;
-                          });
-                        },
-                        icon: const Icon(Icons.add_circle, color: Colors.green),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: placeOrder,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFE65100),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 12),
+                  if (!isProvider) ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        IconButton(
+                          onPressed: () {
+                            setState(() {
+                              if (quantity > 1) quantity--;
+                            });
+                          },
+                          icon: const Icon(Icons.remove_circle,
+                              color: Colors.red),
+                        ),
+                        Text('$quantity', style: const TextStyle(fontSize: 18)),
+                        IconButton(
+                          onPressed: () {
+                            setState(() {
+                              quantity++;
+                            });
+                          },
+                          icon:
+                              const Icon(Icons.add_circle, color: Colors.green),
+                        ),
+                      ],
                     ),
-                    child: const Text("Place Order",
-                        style: TextStyle(color: Colors.white)),
-                  ),
+                    const SizedBox(height: 20),
+                  ],
+
+                  if (!isProvider)
+                    ElevatedButton(
+                      onPressed: placeOrder,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE65100),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                      ),
+                      child: const Text("Place Order",
+                          style: TextStyle(color: Colors.white)),
+                    ),
                 ],
               ),
             ),
