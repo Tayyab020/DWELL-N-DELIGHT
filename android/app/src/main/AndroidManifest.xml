@@ -1,9 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.flutter_appp123">
 
+    <!-- 🔽 Add these location permissions here (before <application>) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Optional: Needed only if you require background location -->
+    <!-- <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" /> -->
+
     <application
         android:label="DWELL N DELIGHT"
-
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"

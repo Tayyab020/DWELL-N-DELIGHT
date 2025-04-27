@@ -1,6 +1,7 @@
-import 'dart:convert' show json, jsonDecode;
+import 'dart:convert' show json, jsonDecode, jsonEncode;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_appp123/home/screens/MapPage.dart';
 import 'package:flutter_appp123/home/screens/ProviderOrdersScreen.dart';
 import 'package:flutter_appp123/home/screens/cart1.dart';
 import 'package:flutter_appp123/home/screens/fav.dart';
@@ -10,6 +11,7 @@ import 'package:flutter_appp123/home/screens/notification.dart';
 import 'package:flutter_appp123/home/screens/seeallfood.dart';
 import 'package:flutter_appp123/home/screens/seeallrentals.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 
@@ -17,13 +19,18 @@ import '../widgets/sectionheader.dart';
 import '../widgets/menu.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final VoidCallback? onRefresh; // Add this callback parameter
 
+  const HomePage({super.key, this.onRefresh});
   @override
   _HomePageState createState() => _HomePageState();
+
+  void refreshPosts() {}
 }
 
 class _HomePageState extends State<HomePage> {
+  String _locationName = "Location"; // Default text
+  bool _isLoadingLocation = false;
   List<Map<String, dynamic>> cartItems = [];
   List<Map<String, dynamic>> favorites = [];
   List<Map<String, String>> notifications = [
@@ -53,6 +60,84 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     fetchBlogs();
     _loadUserRole();
+    _loadSavedLocation();
+  }
+
+  Future<void> refreshPosts() async {
+    await fetchBlogs();
+    if (widget.onRefresh != null) {
+      widget.onRefresh!(); // Call the parent's refresh callback if it exists
+    }
+  }
+
+  Future<void> _loadSavedLocation() async {
+    setState(() => _isLoadingLocation = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userString = prefs.getString('user');
+
+      if (userString != null) {
+        final user = jsonDecode(userString);
+
+        // First try local storage
+        final localLocation = prefs.getString('saved_location');
+        if (localLocation != null) {
+          final locData = jsonDecode(localLocation);
+          await _reverseGeocode(LatLng(locData['lat'], locData['lng']));
+          return;
+        }
+
+        // Fallback to backend if local not available
+        if (user['location'] != null) {
+          final coords = user['location']['coordinates'];
+          final position = LatLng(coords[1], coords[0]);
+          await _reverseGeocode(position);
+
+          // Save to local storage for future use
+          await prefs.setString(
+              'saved_location',
+              jsonEncode(
+                  {'lat': position.latitude, 'lng': position.longitude}));
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading location: $e');
+      setState(() => _locationName = "Location"); // Fallback to default
+    } finally {
+      setState(() => _isLoadingLocation = false);
+    }
+  }
+
+  Future<void> _reverseGeocode(LatLng position) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+            'https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.latitude}&lon=${position.longitude}&zoom=18&addressdetails=1'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final address = data['address'];
+
+        // Create a more readable address format
+        String displayName = [
+          address['road'],
+          address['neighbourhood'],
+          address['suburb'],
+          address['city']
+        ].where((part) => part != null).join(', ');
+
+        setState(() {
+          _locationName = displayName.isNotEmpty ? displayName : "My Location";
+        });
+
+        // Cache the name locally
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cached_location_name', _locationName);
+      }
+    } catch (e) {
+      setState(() => _locationName = "My Location");
+    }
   }
 
   Future<void> _loadUserRole() async {
@@ -66,14 +151,15 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> fetchBlogs() async {
+  Future<bool> fetchBlogs() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userString = prefs.getString('user');
 
       if (userString == null) {
         print('❌ No user data found in local storage');
-        return;
+        return false;
+        ;
       }
       final user = jsonDecode(userString);
       final userId = user['_id'];
@@ -104,11 +190,14 @@ class _HomePageState extends State<HomePage> {
         setState(() {
           blogs = data['blogs'] ?? [];
         });
+        return true; // Success
       } else {
         print('❌ Failed with status: ${response.statusCode}');
+        return false;
       }
     } catch (e) {
       print('❌ Error fetching blogs: $e');
+      return false;
     }
   }
 
@@ -177,15 +266,49 @@ class _HomePageState extends State<HomePage> {
               },
             ),
           ),
-          title: const Padding(
-            padding: EdgeInsets.only(top: 20.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.location_on, color: Color(0xFFE65100)),
-                Text('Location', style: TextStyle(color: Color(0xFFE65100))),
-                Icon(Icons.arrow_drop_down, color: Color(0xFFE65100)),
-              ],
+          title: GestureDetector(
+            onTap: () async {
+              final newLocation = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => LocationPickerScreen(),
+                ),
+              );
+
+              if (newLocation != null) {
+                await _loadSavedLocation(); // Refresh location after returning
+              }
+            },
+            child: Padding(
+              padding: EdgeInsets.only(top: 20.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.location_on, color: Color(0xFFE65100)),
+                  SizedBox(width: 4),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: 150),
+                    child: _isLoadingLocation
+                        ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFFE65100),
+                            ),
+                          )
+                        : Text(
+                            _locationName,
+                            style: TextStyle(
+                              color: Color(0xFFE65100),
+                              overflow: TextOverflow.ellipsis,
+                              // maxLines: 1,
+                            ),
+                          ),
+                  ),
+                  Icon(Icons.arrow_drop_down, color: Color(0xFFE65100)),
+                ],
+              ),
             ),
           ),
           actions: [
@@ -213,7 +336,8 @@ class _HomePageState extends State<HomePage> {
             Padding(
               padding: const EdgeInsets.only(top: 20.0),
               child: IconButton(
-                icon: Icon(  role == 'provider'
+                icon: Icon(
+                    role == 'provider'
                         ? Icons.list_alt_outlined
                         : Icons.shopping_cart_outlined,
                     color: const Color(0xFFE65100)),
@@ -246,7 +370,8 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
-      body: SingleChildScrollView(
+      body: RefreshIndicator(
+        onRefresh: refreshPosts,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 0.0),
           child: Column(

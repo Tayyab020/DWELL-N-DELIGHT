@@ -272,9 +272,7 @@ class _SignUpScreenState extends State<SignUp> {
                                 SocialSignUpButton(
                                     icon: 'assets/icons/google.png',
                                     onTap: () {}),
-                                SocialSignUpButton(
-                                    icon: 'assets/icons/apple.png',
-                                    onTap: () {}),
+                              
                                 SocialSignUpButton(
                                     icon: 'assets/icons/facebook.png',
                                     onTap: () {}),

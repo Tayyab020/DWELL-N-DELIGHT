@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter_appp123/home/home_screen.dart';
 import 'package:flutter_appp123/forget-pswd/forget_pswd.dart';
 import 'package:flutter_appp123/services/auth_service.dart';
+import 'package:flutter_appp123/sign_up/sign_up.dart';
 import 'package:fluttertoast/fluttertoast.dart'; // For showing toast messages
 import 'package:http/http.dart' as http; // Import HTTP package
 import 'package:url_launcher/url_launcher.dart';
@@ -364,7 +365,7 @@ class _SignInState extends State<SignIn> {
                                             context,
                                             MaterialPageRoute(
                                               builder: (context) =>
-                                                  const HomeScreen(),
+                                                  const SignUp(),
                                             ),
                                           );
                                         },

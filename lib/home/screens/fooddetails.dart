@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../screens/order.dart';
 import 'package:provider/provider.dart';
 import 'cartprovider.dart';
@@ -16,6 +17,7 @@ class FoodDetailPage extends StatefulWidget {
   final String title;
   final String description;
   final double price;
+
   final Function(Map<String, dynamic>) addToCart;
   final List<Map<String, dynamic>> favorites;
 
@@ -36,9 +38,10 @@ class FoodDetailPage extends StatefulWidget {
 
 class _FoodDetailPageState extends State<FoodDetailPage> {
   bool isLiked = false;
-  double rating = 0;
-  int quantity = 1; // Added quantity
+  bool isLoadingLikeStatus = true;
 
+  double rating = 0;
+  int quantity = 1;
   List<Map<String, dynamic>> rentalItems = [];
 
   Future<void> fetchRentalBlogs() async {
@@ -84,23 +87,114 @@ class _FoodDetailPageState extends State<FoodDetailPage> {
   @override
   void initState() {
     super.initState();
+
+    // Fetch available food rental blogs
     fetchRentalBlogs();
-    isLiked = widget.favorites.any((item) => item['name'] == widget.title);
+
+    // Initialize favorite status
+    checkIfLiked();
   }
 
-  void toggleFavorite() {
+  Future<void> checkIfLiked() async {
     setState(() {
-      if (isLiked) {
-        widget.favorites.removeWhere((item) => item['name'] == widget.title);
-      } else {
-        widget.favorites.add({
-          'name': widget.title,
-          'price': widget.price,
-          'image': widget.imageUrl,
-        });
-      }
-      isLiked = !isLiked;
+      isLoadingLikeStatus = true;
     });
+
+    try {
+      final backendUrl = dotenv.env['BACKEND_URL'];
+      if (backendUrl == null) {
+        debugPrint("❌ BACKEND_URL not found in .env");
+        throw Exception("Backend URL not configured");
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final userString = prefs.getString('user');
+      final userId = userString != null ? jsonDecode(userString)['_id'] : null;
+
+      if (userId == null) {
+        debugPrint("❌ User ID not found");
+        throw Exception("User not authenticated");
+      }
+
+      final uri =
+          Uri.parse('$backendUrl/checkfavorite').replace(queryParameters: {
+        'itemId': widget.itemId,
+        'userId': userId,
+      });
+
+      debugPrint('🌐 Checking favorite: ${uri.toString()}');
+
+      final response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      debugPrint('🔍 Response status: ${response.statusCode}');
+      debugPrint('🔍 Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        setState(() {
+          isLiked = responseData['isLiked'] ?? false;
+        });
+        debugPrint('✅ Favorite status: $isLiked');
+      } else {
+        debugPrint("❌ Server error: ${response.body}");
+        throw Exception("Failed to check favorite status");
+      }
+    } catch (e) {
+      debugPrint("❌ Error checking favorite: $e");
+      // Optionally show error to user
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error checking favorite status"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        isLoadingLikeStatus = false;
+      });
+    }
+  }
+
+  Future<void> toggleFavorite() async {
+    final previousState = isLiked;
+
+    try {
+      setState(() {
+        isLiked = !isLiked; // Optimistic update
+      });
+
+      final backendUrl = dotenv.env['BACKEND_URL'];
+      final prefs = await SharedPreferences.getInstance();
+      final userId = jsonDecode(prefs.getString('user')!)['_id'];
+
+      final response = await http.post(
+        Uri.parse('$backendUrl/addfavorite'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'itemId': widget.itemId,
+          'userId': userId,
+          'isLiked': isLiked,
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to update favorite');
+      }
+    } catch (e) {
+      debugPrint("❌ Error toggling favorite: $e");
+      setState(() {
+        isLiked = previousState; // Revert on error
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to update favorite"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void placeOrder() {
@@ -129,7 +223,7 @@ class _FoodDetailPageState extends State<FoodDetailPage> {
 
     final Map<String, dynamic> product = {
       'title': widget.title,
-      'imageUrl': widget.imageUrl, // Ensure correct image key
+      'imageUrl': widget.imageUrl,
       'price': widget.price,
       'quantity': quantity,
     };
@@ -147,7 +241,8 @@ class _FoodDetailPageState extends State<FoodDetailPage> {
 
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const CartPage(cartItems: [], totalPrice: 0)),
+      MaterialPageRoute(
+          builder: (context) => const CartPage(cartItems: [], totalPrice: 0)),
     );
   }
 
@@ -163,9 +258,7 @@ class _FoodDetailPageState extends State<FoodDetailPage> {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: rentalItems.isEmpty
-          ? const Center(
-              child: CircularProgressIndicator(),
-            )
+          ? const Center(child: CircularProgressIndicator())
           : Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -181,29 +274,21 @@ class _FoodDetailPageState extends State<FoodDetailPage> {
                           color: const Color(0xFFFBE9E7),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color:
-                                const Color(0xFFE65100), // Orange border color
-                            width: 2,
-                          ),
+                              color: const Color(0xFFE65100), width: 2),
                         ),
                       ),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: widget.imageUrl.toLowerCase().endsWith('.mp4') ||
-                                widget.imageUrl
-                                    .toLowerCase()
-                                    .contains('video/upload')
+                                widget.imageUrl.contains('video/upload')
                             ? Stack(
                                 alignment: Alignment.center,
                                 children: [
-                                  VideoPlayerWidget(
-                                      url: widget
-                                          .imageUrl), // Display video here
+                                  VideoPlayerWidget(url: widget.imageUrl),
                                   IconButton(
                                     icon: Icon(Icons.play_arrow,
                                         color: Colors.white, size: 50),
                                     onPressed: () {
-                                      // You can add logic to play the video or navigate to a full-screen player
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
@@ -226,34 +311,43 @@ class _FoodDetailPageState extends State<FoodDetailPage> {
                     ],
                   ),
                   const SizedBox(height: 20),
-
-                  /// 🛒 **Action Row**
                   Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
-                      IconButton(
-                        onPressed: toggleFavorite,
-                        icon: Icon(
-                          isLiked ? Icons.favorite : Icons.favorite_border,
-                          color: isLiked ? Colors.red : const Color(0xFFE65100),
-                          size: 24,
-                        ),
-                      ),
+                      // Updated favorite button with loading state
+                      isLoadingLikeStatus
+                          ? const Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Color(0xFFE65100),
+                                ),
+                              ),
+                            )
+                          : IconButton(
+                              onPressed: toggleFavorite,
+                              icon: Icon(
+                                isLiked
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: isLiked
+                                    ? Colors.red
+                                    : const Color(0xFFE65100),
+                                size: 24,
+                              ),
+                            ),
                       IconButton(
                         onPressed: addToCart,
-                        icon: const Icon(
-                          Icons.shopping_cart,
-                          color: Color(0xFFE65100),
-                          size: 24,
-                        ),
+                        icon: const Icon(Icons.shopping_cart,
+                            color: Color(0xFFE65100), size: 24),
                       ),
                       IconButton(
                         onPressed: shareProduct,
-                        icon: const Icon(
-                          Icons.share,
-                          color: Color(0xFFE65100),
-                          size: 24,
-                        ),
+                        icon: const Icon(Icons.share,
+                            color: Color(0xFFE65100), size: 24),
                       ),
                       Row(
                         children: [
@@ -272,34 +366,19 @@ class _FoodDetailPageState extends State<FoodDetailPage> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 20),
-
-                  /// 📝 **Description**
-                  Text(
-                    widget.description,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      height: 1.5,
-                    ),
-                    textAlign: TextAlign.start,
-                  ),
-
+                  Text(widget.description,
+                      style: const TextStyle(fontSize: 16, height: 1.5),
+                      textAlign: TextAlign.start),
                   const SizedBox(height: 20),
-
-                  /// 💰 **Price**
                   Text(
                     "Price: PKR ${widget.price.toStringAsFixed(2)}",
                     style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
-                    ),
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green),
                   ),
-
                   const SizedBox(height: 20),
-
-                  /// 🔢 **Quantity Selector**
                   Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
@@ -312,10 +391,7 @@ class _FoodDetailPageState extends State<FoodDetailPage> {
                         icon:
                             const Icon(Icons.remove_circle, color: Colors.red),
                       ),
-                      Text(
-                        '$quantity',
-                        style: const TextStyle(fontSize: 18),
-                      ),
+                      Text('$quantity', style: const TextStyle(fontSize: 18)),
                       IconButton(
                         onPressed: () {
                           setState(() {
@@ -326,24 +402,18 @@ class _FoodDetailPageState extends State<FoodDetailPage> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 20),
-
-                  /// 🛍 **Place Order Button**
                   ElevatedButton(
                     onPressed: placeOrder,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFE65100),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                          borderRadius: BorderRadius.circular(12)),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 12),
                     ),
-                    child: const Text(
-                      "Place Order",
-                      style: TextStyle(color: Colors.white),
-                    ),
+                    child: const Text("Place Order",
+                        style: TextStyle(color: Colors.white)),
                   ),
                 ],
               ),
