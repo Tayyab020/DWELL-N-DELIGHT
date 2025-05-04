@@ -1,10 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_appp123/home/screens/home_page.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:url_launcher/url_launcher.dart'; // Add this import
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class ApiConfig {
   static final String baseUrl = "${dotenv.env['BACKEND_URL']}";
@@ -44,6 +48,42 @@ class AuthService {
         );
       },
     );
+  }
+
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+    clientId: 'YOUR_CLIENT_ID.apps.googleusercontent.com', // From Google Cloud
+  );
+
+  Future<void> _signUpWithGoogle() async {
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) return;
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      final String? idToken = googleAuth.idToken;
+
+      if (idToken == null) throw Exception("No ID token");
+
+      String backendUrl = dotenv.env['BACKEND_URL']!;
+      // Send to backend
+      final response = await http.post(
+        Uri.parse('$backendUrl/google'),
+        body: jsonEncode({'idToken': idToken}),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // Save JWT and user data in Flutter (e.g., SharedPreferences)
+        //  await storage.write(key: 'token', value: data['token']);
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (_) => HomePage()));
+      }
+    } catch (e) {
+      print('Google Sign-In Error: $e');
+    }
   }
 
   // ✅ Sign In User & Save Token + User ID
@@ -174,8 +214,7 @@ class AuthService {
     }
   }
 
-  // ✅ Handle Sign Up (Ensure No Old Session Interference)
-  Future<Map<String, dynamic>?> signUpUser({
+  Future<Map<String, dynamic>> signUpUser({
     required String email,
     required String password,
     required String name,
@@ -183,8 +222,6 @@ class AuthService {
     required String role,
   }) async {
     try {
-      await logout(); // Clear previous session before new signup
-
       final response = await http.post(
         Uri.parse("$url/register"),
         headers: {"Content-Type": "application/json"},
@@ -197,43 +234,96 @@ class AuthService {
         }),
       );
 
+      print(response.statusCode);
+      print(response.body);
+
+      final responseData = jsonDecode(response.body);
+
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final responseData = jsonDecode(response.body);
-
-        if (responseData.containsKey("user") && responseData["auth"] == true) {
-          // Extract the user object
-          Map<String, dynamic> user = responseData["user"];
-
-          // 🔥 Get token from cookies (Set-Cookie header)
-          String? rawCookie = response.headers['set-cookie'];
-          String? token;
-          if (rawCookie != null) {
-            final cookies = rawCookie.split(';');
-            token = cookies[0]; // Extract token from cookie
-          }
-          print('🔑 Token from cookies: $token');
-          if (token != null) {
-            // Save both user object and token to local storage
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString(
-                'user', jsonEncode(user)); // Save entire user object
-            await prefs.setString('token', token); // Save token
-          } else {
-            return {"error": "Token not found in response headers"};
-          }
-          print('responseData: $responseData');
-          return responseData;
-        } else {
-          return {"error": "Authentication failed or user info missing"};
-        }
+        return {
+          "success": true,
+          "message": responseData['message'] ?? "Registration successful",
+        };
+      } else if (response.statusCode == 409) {
+        return {
+          "success": false,
+          "error": responseData['message'] ?? "Email already registered",
+        };
       } else {
-        print("❌ Signup Failed: ${response.body}");
-        final errorBody = jsonDecode(response.body);
-        return {"error": errorBody['message'] ?? "Signup failed"};
+        return {
+          "success": false,
+          "error": responseData['message'] ?? "Signup failed",
+        };
       }
     } catch (e) {
       print("❌ Error during signup: $e");
-      return {"error": e.toString()};
+      return {
+        "success": false,
+        "error": e.toString(),
+      };
     }
   }
 }
+  // ✅ Handle Sign Up (Ensure No Old Session Interference)
+  // Future<Map<String, dynamic>?> signUpUser({
+  //   required String email,
+  //   required String password,
+  //   required String name,
+  //   required String mobile,
+  //   required String role,
+  // }) async {
+  //   try {
+  //     await logout(); // Clear previous session before new signup
+
+  //     final response = await http.post(
+  //       Uri.parse("$url/register"),
+  //       headers: {"Content-Type": "application/json"},
+  //       body: jsonEncode({
+  //         "email": email,
+  //         "password": password,
+  //         "name": name,
+  //         "phone": mobile,
+  //         "role": role
+  //       }),
+  //     );
+
+  //     if (response.statusCode == 200 || response.statusCode == 201) {
+  //       final responseData = jsonDecode(response.body);
+  //       print('responseData: $responseData');
+  //       if (responseData.containsKey("user") && responseData["auth"] == true) {
+  //         // Extract the user object
+  //         Map<String, dynamic> user = responseData["user"];
+
+  //         // 🔥 Get token from cookies (Set-Cookie header)
+  //         String? rawCookie = response.headers['set-cookie'];
+  //         String? token;
+  //         if (rawCookie != null) {
+  //           final cookies = rawCookie.split(';');
+  //           token = cookies[0]; // Extract token from cookie
+  //         }
+  //         print('🔑 Token from cookies: $token');
+  //         if (token != null) {
+  //           // Save both user object and token to local storage
+  //           final prefs = await SharedPreferences.getInstance();
+  //           await prefs.setString(
+  //               'user', jsonEncode(user)); // Save entire user object
+  //           await prefs.setString('token', token); // Save token
+  //         } else {
+  //           return {"error": "Token not found in response headers"};
+  //         }
+  //         print('responseData: $responseData');
+  //         return responseData['message'];
+  //       } else {
+  //         return {"error": "Authentication failed or user info missing"};
+  //       }
+  //     } else {
+  //       print("❌ Signup Failed: ${response.body}");
+  //       final errorBody = jsonDecode(response.body);
+  //       return {"error": errorBody['message'] ?? "Signup failed"};
+  //     }
+  //   } catch (e) {
+  //     print("❌ Error during signup: $e");
+  //     return {"error": e.toString()};
+  //   }
+  // }
+

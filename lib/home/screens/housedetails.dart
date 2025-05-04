@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import '../screens/landlord.dart';
 
-
 import 'package:flutter_appp123/home/screens/VideoPlayerWidget.dart';
+
 class HouseDetailPage extends StatefulWidget {
   final String imageUrl;
   final String title;
   final String description;
   final double price;
+  final String authorId;
 
   const HouseDetailPage({
     super.key,
@@ -16,6 +17,7 @@ class HouseDetailPage extends StatefulWidget {
     required this.title,
     required this.description,
     required this.price,
+    required this.authorId,
   });
 
   @override
@@ -136,7 +138,13 @@ class _HouseDetailPageState extends State<HouseDetailPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => LandlordProfilePage()),
+                      builder: (context) => LandlordProfilePage(
+                        authorId: widget.authorId,
+                            imageUrl: widget.imageUrl,
+                            title: widget.title,
+                            description: widget.description,
+                            price: widget.price,
+                          )),
                 );
               },
               style: ElevatedButton.styleFrom(

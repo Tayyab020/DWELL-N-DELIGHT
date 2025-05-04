@@ -4,7 +4,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_appp123/SettingsPage2.dart';
 import 'package:flutter_appp123/home/screens/editprofile.dart';
+import 'package:flutter_appp123/home/screens/fooddetails.dart';
 import 'package:flutter_appp123/home/screens/helpandsupport.dart';
+import 'package:flutter_appp123/home/screens/housedetails.dart';
 import 'package:flutter_appp123/home/screens/rateapp.dart';
 import 'package:flutter_appp123/orderhistory.dart';
 import 'package:flutter_appp123/signout.dart';
@@ -32,13 +34,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String profileImage = "";
   bool isLoading = true;
   bool isUpdatingImage = false;
-
-  final List<String> userPosts = [
-    'assets/icons/house1.png',
-    'assets/icons/house2.png',
-    'assets/icons/house3.png',
-    'assets/icons/house4.jpg',
-  ];
+  List<dynamic> userBlogs = [];
+  bool loadingBlogs = true;
 
   final ImagePicker _picker = ImagePicker();
 
@@ -46,6 +43,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadUserData();
+    _loadUserBlogs();
   }
 
   Future<void> _loadUserData() async {
@@ -90,6 +88,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _loadUserBlogs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userString = prefs.getString('user');
+
+      if (userString == null) {
+        print("User not found in SharedPreferences.");
+        return;
+      }
+
+      final userMap = json.decode(userString);
+      final userId = userMap['_id'];
+      if (userId == null) {
+        print("User ID not found");
+        return;
+      }
+
+      String backendUrl = dotenv.env['BACKEND_URL']!;
+
+      final response = await http.get(
+        Uri.parse('$backendUrl/blogs/author/$userId'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          setState(() {
+            userBlogs = data['blogs'];
+            loadingBlogs = false;
+          });
+        }
+      } else {
+        print("Failed to fetch user blogs: ${response.body}");
+        setState(() {
+          loadingBlogs = false;
+        });
+      }
+    } catch (e) {
+      print("Error loading user blogs: $e");
+      setState(() {
+        loadingBlogs = false;
+      });
+    }
+  }
+
   Future<void> _updateProfileImage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -105,7 +148,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final userId = userMap['_id'];
       String backendUrl = dotenv.env['BACKEND_URL'] ?? "";
 
-      // Show image picker options
       final XFile? image = await showModalBottomSheet<XFile>(
         context: context,
         builder: (BuildContext context) {
@@ -157,7 +199,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           final jsonData = jsonDecode(responseData);
 
           if (jsonData['user']?['profileImage'] != null) {
-            // Update both local state and shared preferences
             await prefs.setString('user', json.encode(jsonData['user']));
 
             setState(() {
@@ -165,7 +206,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               isUpdatingImage = false;
             });
 
-            // Show success message
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                   content: Text('Profile image updated successfully')),
@@ -248,23 +288,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildDetailRow(IconData icon, String title, String content) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.deepOrange),
-        const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            Text(content, style: const TextStyle(fontSize: 14)),
-          ],
-        ),
-      ],
-    );
-  }
+  // Widget _buildDetailRow(IconData icon, String title, String content) {
+  //   return Row(
+  //     children: [
+  //       Icon(icon, color: Colors.deepOrange),
+  //       const SizedBox(width: 10),
+  //       Column(
+  //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         children: [
+  //           Text(title,
+  //               style:
+  //                   const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+  //           Text(content, style: const TextStyle(fontSize: 14)),
+  //         ],
+  //       ),
+  //     ],
+  //   );
+  // }
 
   Widget _buildMoreOptionsSheet() {
     return SafeArea(
@@ -301,211 +341,128 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text("My Profile", style: TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFFE65100),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit, color: Colors.white),
-            onPressed: _editProfile,
-          ),
-          IconButton(
-            icon: const Icon(Icons.more_vert, color: Colors.white),
-            onPressed: () => showModalBottomSheet(
-              context: context,
-              builder: (_) => _buildMoreOptionsSheet(),
-            ),
-          ),
-        ],
-      ),
-      drawer: _buildDrawer(),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Column(
-                children: [
-                  // Profile Header
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE65100),
-                      borderRadius: const BorderRadius.vertical(
-                          bottom: Radius.circular(20)),
-                    ),
-                    child: Column(
-                      children: [
-                        Stack(
-                          alignment: Alignment.bottomRight,
-                          children: [
-                            CircleAvatar(
-                              radius: 50,
-                              backgroundColor: Colors.grey[200],
-                              backgroundImage: profileImage.isNotEmpty
-                                  ? NetworkImage(profileImage)
-                                  : const AssetImage('assets/icons/girl.jfif')
-                                      as ImageProvider,
-                              child: isUpdatingImage
-                                  ? const CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                          Colors.white),
-                                    )
-                                  : null,
-                            ),
-                            if (!isUpdatingImage)
-                              GestureDetector(
-                                onTap: _updateProfileImage,
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFE65100),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: Colors.white, width: 2),
-                                  ),
-                                  child: const Icon(
-                                    Icons.camera_alt,
-                                    size: 18,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          userName,
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        // Text(
-                        //   "Real Estate Agent",
-                        //   style: TextStyle(
-                        //     fontSize: 16,
-                        //     color: Colors.white.withOpacity(0.9),
-                        //   ),
-                        // ),
-                      ],
-                    ),
-                  ),
-
-                  // User Details
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            _buildDetailRow(Icons.person, "Name", userName),
-                               const Divider(height: 20),
-                            _buildDetailRow(
-                                Icons.phone, "Contact", userContact),
-                            const Divider(height: 20),
-                            _buildDetailRow(Icons.email, "Email", userEmail),
-                            const Divider(height: 20),
-                            _buildDetailRow(
-                                Icons.location_on, "Location", userLocation),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Properties Section
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "My Properties",
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFFE65100)),
-                        ),
-                        const SizedBox(height: 12),
-                        CarouselSlider(
-                          options: CarouselOptions(
-                            height: 200,
-                            enlargeCenterPage: true,
-                            viewportFraction: 0.8,
-                          ),
-                          items: userPosts.map((imagePath) {
-                            return ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.asset(
-                                imagePath,
-                                fit: BoxFit.cover,
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Action Buttons
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.share,
-                                color: Color(0xFFE65100)),
-                            label: const Text("Share",
-                                style: TextStyle(color: Color(0xFFE65100))),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                              side: const BorderSide(color: Color(0xFFE65100)),
-                            ),
-                            onPressed: () {},
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            icon:
-                                const Icon(Icons.message, color: Colors.white),
-                            label: const Text("Contact",
-                                style: TextStyle(color: Colors.white)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFE65100),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                            ),
-                            onPressed: () {},
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-    );
-  }
+  // Widget _buildBlogCard(dynamic blog) {
+  //   return GestureDetector(
+  //     onTap: () {
+  //       if (blog['type'] == 'food') {
+  //         // Navigate to food detail page
+  //         Navigator.push(
+  //             context,
+  //             MaterialPageRoute(
+  //                 builder: (_) => FoodDetailPage(
+  //                       itemId: blog['itemId'],
+  //                       imageUrl: blog['imageUrl'],
+  //                       title: blog['title'],
+  //                       description: blog['description'],
+  //                       price: blog['price'],
+  //                       // addToCart: {},
+  //                       favorites: [],
+  //                     )));
+  //       } else if (blog['type'] == 'rental') {
+  //         // Navigate to house detail page
+  //         Navigator.push(
+  //             context,
+  //             MaterialPageRoute(
+  //                 builder: (_) => HouseDetailPage(
+  //                       authorId: blog['authorId'],
+  //                       imageUrl: blog['imageUrl'],
+  //                       title: blog['title'],
+  //                       description: blog['description'],
+  //                       price: blog['price'],
+  //                       // itemId: blog['itemId'],
+  //                     )));
+  //       }
+  //     },
+  //     child: Card(
+  //       elevation: 4,
+  //       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+  //       shape: RoundedRectangleBorder(
+  //         borderRadius: BorderRadius.circular(12),
+  //       ),
+  //       child: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.stretch,
+  //         children: [
+  //           ClipRRect(
+  //             borderRadius:
+  //                 const BorderRadius.vertical(top: Radius.circular(12)),
+  //             child: Image.network(
+  //               blog['photoPath'],
+  //               height: 180,
+  //               fit: BoxFit.cover,
+  //               errorBuilder: (context, error, stackTrace) => Container(
+  //                 height: 180,
+  //                 color: Colors.grey[300],
+  //                 child: const Icon(Icons.broken_image, size: 50),
+  //               ),
+  //             ),
+  //           ),
+  //           Padding(
+  //             padding: const EdgeInsets.all(12),
+  //             child: Column(
+  //               crossAxisAlignment: CrossAxisAlignment.start,
+  //               children: [
+  //                 Row(
+  //                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //                   children: [
+  //                     Expanded(
+  //                       child: Text(
+  //                         blog['title'],
+  //                         style: const TextStyle(
+  //                           fontWeight: FontWeight.bold,
+  //                           fontSize: 18,
+  //                         ),
+  //                         maxLines: 1,
+  //                         overflow: TextOverflow.ellipsis,
+  //                       ),
+  //                     ),
+  //                     if (blog['isBlocked'] == true)
+  //                       const Icon(Icons.block, color: Colors.red),
+  //                   ],
+  //                 ),
+  //                 const SizedBox(height: 8),
+  //                 Text(
+  //                   blog['content'],
+  //                   style: const TextStyle(fontSize: 14),
+  //                   maxLines: 2,
+  //                   overflow: TextOverflow.ellipsis,
+  //                 ),
+  //                 const SizedBox(height: 12),
+  //                 Row(
+  //                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //                   children: [
+  //                     Chip(
+  //                       label: Text(
+  //                         blog['type'].toString().toUpperCase(),
+  //                         style: const TextStyle(color: Colors.white),
+  //                       ),
+  //                       backgroundColor: const Color(0xFFE65100),
+  //                     ),
+  //                     Text(
+  //                       '\$${blog['price']}',
+  //                       style: const TextStyle(
+  //                         fontWeight: FontWeight.bold,
+  //                         fontSize: 18,
+  //                         color: Colors.deepOrange,
+  //                       ),
+  //                     ),
+  //                   ],
+  //                 ),
+  //                 const SizedBox(height: 8),
+  //                 Text(
+  //                   'Posted on: ${DateTime.parse(blog['createdAt']).toLocal().toString().split(' ')[0]}',
+  //                   style: const TextStyle(
+  //                     fontSize: 12,
+  //                     color: Colors.grey,
+  //                   ),
+  //                 ),
+  //               ],
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
   Widget _buildDrawer() {
     return Drawer(
@@ -545,6 +502,440 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _buildDrawerItem(Icons.star, 'Rate App', 'Rate the App'),
           const Divider(),
           _buildDrawerItem(Icons.logout, 'Logout', 'Logout'),
+        ],
+      ),
+    );
+  }
+
+// ... (keep all your imports and other code above)
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        title: const Text("My Profile",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFFE65100),
+        elevation: 0,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        ),
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu, color: Colors.white),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit, color: Colors.white),
+            onPressed: _editProfile,
+          ),
+        ],
+      ),
+      drawer: _buildDrawer(),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Profile Header with Gradient
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0xFFE65100), Color(0xFFF57C00)],
+                      ),
+                      borderRadius: const BorderRadius.vertical(
+                          bottom: Radius.circular(30)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.orange.withOpacity(0.3),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 3,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.2),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 5),
+                                  ),
+                                ],
+                              ),
+                              child: CircleAvatar(
+                                radius: 50,
+                                backgroundColor: Colors.grey[200],
+                                backgroundImage: profileImage.isNotEmpty
+                                    ? NetworkImage(profileImage)
+                                    : const AssetImage('assets/icons/girl.jfif')
+                                        as ImageProvider,
+                                child: isUpdatingImage
+                                    ? const CircularProgressIndicator(
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                                Colors.white),
+                                      )
+                                    : null,
+                              ),
+                            ),
+                            if (!isUpdatingImage)
+                              FloatingActionButton(
+                                mini: true,
+                                backgroundColor: Colors.white,
+                                onPressed: _updateProfileImage,
+                                child: const Icon(
+                                  Icons.camera_alt,
+                                  color: Color(0xFFE65100),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          userName,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          userEmail,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white.withOpacity(0.9),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // User Details Card with Neumorphic Design
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      shadowColor: Colors.grey[200],
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(15),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.1),
+                              spreadRadius: 3,
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            children: [
+                              _buildDetailRow(
+                                Icons.person_outline_rounded,
+                                "Name",
+                                userName,
+                              ),
+                              const Divider(height: 20, color: Colors.grey),
+                              _buildDetailRow(
+                                Icons.phone_iphone_rounded,
+                                "Contact",
+                                userContact,
+                              ),
+                              const Divider(height: 20, color: Colors.grey),
+                              _buildDetailRow(
+                                Icons.email_outlined,
+                                "Email",
+                                userEmail,
+                              ),
+                              const Divider(height: 20, color: Colors.grey),
+                              _buildDetailRow(
+                                Icons.location_on_outlined,
+                                "Location",
+                                userLocation,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // My Posts Section with Modern Carousel
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(left: 8, bottom: 8),
+                          child: Text(
+                            "My Posts",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFE65100),
+                            ),
+                          ),
+                        ),
+                        loadingBlogs
+                            ? const Center(child: CircularProgressIndicator())
+                            : userBlogs.isEmpty
+                                ? Center(
+                                    child: Column(
+                                      children: [
+                                        // Image.asset(
+                                        //   'assets/images/no_posts.png',
+                                        //   height: 120,
+                                        // ),
+                                        const SizedBox(height: 10),
+                                        const Text(
+                                          "No posts yet",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : SizedBox(
+                                    height: 220,
+                                    child: CarouselSlider.builder(
+                                      itemCount: userBlogs.length,
+                                      options: CarouselOptions(
+                                        autoPlay: true,
+                                        aspectRatio: 16 / 9,
+                                        enlargeCenterPage: true,
+                                        viewportFraction: 0.8,
+                                        autoPlayCurve: Curves.fastOutSlowIn,
+                                      ),
+                                      itemBuilder: (context, index, realIndex) {
+                                        final blog = userBlogs[index];
+                                        return GestureDetector(
+                                          onTap: () {
+                                            // Keep your navigation logic
+                                          },
+                                          child: Container(
+                                            margin: const EdgeInsets.all(5),
+                                            decoration: BoxDecoration(
+                                              borderRadius:
+                                                  BorderRadius.circular(15),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.grey
+                                                      .withOpacity(0.2),
+                                                  blurRadius: 6,
+                                                  offset: const Offset(0, 3),
+                                                ),
+                                              ],
+                                            ),
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(15),
+                                              child: Stack(
+                                                fit: StackFit.expand,
+                                                children: [
+                                                  Image.network(
+                                                    blog['photoPath'],
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (context,
+                                                            error,
+                                                            stackTrace) =>
+                                                        Container(
+                                                      color: Colors.grey[200],
+                                                      child: const Icon(
+                                                        Icons.broken_image,
+                                                        color: Colors.grey,
+                                                        size: 40,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Container(
+                                                    decoration: BoxDecoration(
+                                                      gradient: LinearGradient(
+                                                        begin: Alignment
+                                                            .bottomCenter,
+                                                        end:
+                                                            Alignment.topCenter,
+                                                        colors: [
+                                                          Colors.black
+                                                              .withOpacity(0.7),
+                                                          Colors.transparent,
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Positioned(
+                                                    bottom: 10,
+                                                    left: 10,
+                                                    right: 10,
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                       
+                                                        Row(
+                                                          mainAxisAlignment:
+                                                              MainAxisAlignment
+                                                                  .spaceBetween,
+                                                          children: [
+                                                            Text(
+                                                              blog['title'],
+                                                              style:
+                                                                  const TextStyle(
+                                                                color: Colors
+                                                                    .white,
+                                                                fontSize: 16,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
+                                                              maxLines: 1,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                            ),
+                                                            Text(
+                                                              '\$${blog['price']}',
+                                                              style:
+                                                                  const TextStyle(
+                                                               color: const Color(
+                                                                    0xFFE65100),
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                      ],
+                    ),
+                  ),
+
+                  // Action Buttons with Modern Design
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.share, size: 20),
+                            label: const Text("Share"),
+                            style: ElevatedButton.styleFrom(
+                              foregroundColor: const Color(0xFFE65100),
+                              backgroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                side: const BorderSide(
+                                  color: Color(0xFFE65100),
+                                  width: 1,
+                                ),
+                              ),
+                              elevation: 0,
+                            ),
+                            onPressed: () {},
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.message, size: 20),
+                            label: const Text("Contact"),
+                            style: ElevatedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              backgroundColor: const Color(0xFFE65100),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              elevation: 2,
+                            ),
+                            onPressed: () {},
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+// Enhanced Detail Row Widget
+  Widget _buildDetailRow(IconData icon, String title, String content) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE65100).withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: const Color(0xFFE65100), size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  content,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

@@ -17,8 +17,8 @@ class FoodDetailPage extends StatefulWidget {
   final String title;
   final String description;
   final double price;
+  final Function(Map<String, dynamic>)? addToCart;
 
-  final Function(Map<String, dynamic>) addToCart;
   final List<Map<String, dynamic>> favorites;
 
   const FoodDetailPage({
@@ -39,7 +39,7 @@ class FoodDetailPage extends StatefulWidget {
 class _FoodDetailPageState extends State<FoodDetailPage> {
   bool isLiked = false;
   bool isLoadingLikeStatus = true;
-  bool isProvider = false; 
+  bool isProvider = false;
 
   double rating = 0;
   int quantity = 1;
@@ -94,10 +94,11 @@ class _FoodDetailPageState extends State<FoodDetailPage> {
 
     // Initialize favorite status
     checkIfLiked();
-    
-    _checkUserRole(); 
+
+    _checkUserRole();
   }
-   Future<void> _checkUserRole() async {
+
+  Future<void> _checkUserRole() async {
     final prefs = await SharedPreferences.getInstance();
     final userString = prefs.getString('user');
 
@@ -420,7 +421,6 @@ class _FoodDetailPageState extends State<FoodDetailPage> {
                     ),
                     const SizedBox(height: 20),
                   ],
-
                   if (!isProvider)
                     ElevatedButton(
                       onPressed: placeOrder,

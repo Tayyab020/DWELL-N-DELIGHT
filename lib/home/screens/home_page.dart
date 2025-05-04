@@ -488,21 +488,21 @@ class _HomePageState extends State<HomePage> {
                                   .map((blog) {
                                   final price = blog['price'];
                                   return GestureDetector(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => HouseDetailPage(
-                                            imageUrl: blog['photoPath'] ?? '',
-                                            title: blog['title'] ?? '',
-                                            description: blog['content'] ?? '',
-                                            price: (blog['price'] is num)
-                                                ? blog['price'].toDouble()
-                                                : 0.0,
-                                          ),
-                                        ),
-                                      );
-                                    },
+                                    // onTap: () {
+                                    //   Navigator.push(
+                                    //     context,
+                                    //     MaterialPageRoute(
+                                    //       builder: (context) => HouseDetailPage(
+                                    //         imageUrl: blog['photoPath'] ?? '',
+                                    //         title: blog['title'] ?? '',
+                                    //         description: blog['content'] ?? '',
+                                    //         price: (blog['price'] is num)
+                                    //             ? blog['price'].toDouble()
+                                    //             : 0.0,
+                                    //       ),
+                                    //     ),
+                                    //   );
+                                    // },
                                     child: MenuCard(
                                       imageUrl: blog['photoPath'],
                                       title: blog['title'],

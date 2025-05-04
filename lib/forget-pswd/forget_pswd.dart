@@ -1,22 +1,50 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_appp123/Otp/otp_creen.dart';
-import 'widgets/password_inputfield.dart';
+import 'package:flutter_appp123/verify-firgotPassOtp/verify_otp.dart';
+import 'package:flutter_appp123/utils/api_service.dart';
 
-class ForgetPswd extends StatelessWidget {
-  // Remove const from the constructor
-  ForgetPswd({super.key});
+class ForgetPswd extends StatefulWidget {
+  const ForgetPswd({super.key});
 
-  // Form key for validation
+  @override
+  State<ForgetPswd> createState() => _ForgetPswdState();
+}
+
+class _ForgetPswdState extends State<ForgetPswd> {
   final _formKey = GlobalKey<FormState>();
+  final TextEditingController _emailController = TextEditingController();
+  bool _isLoading = false;
 
-  // Navigate to the next screen when submit button is pressed
-  void _navigateToOtpScreen(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const OtpScreen(), // Navigate to OtpScreen
-      ),
-    );
+  Future<void> _submitForm() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
+
+      try {
+        final response = await ApiService.requestOtp(_emailController.text);
+
+        if (response['success'] == true) {
+          Toast.showSuccess(context, response['message']);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  VerifyOtpScreen(email: _emailController.text),
+            ),
+          );
+        } else {
+          Toast.showError(context, response['message'] ?? 'Failed to send OTP');
+        }
+      } catch (e) {
+        Toast.showError(context, 'An error occurred: $e');
+      } finally {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
   }
 
   @override
@@ -30,7 +58,7 @@ class ForgetPswd extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Column(
                 children: [
-                  const SizedBox(height: 140), // To create space for the image
+                  const SizedBox(height: 140),
                   const Text(
                     'Forgot Password ?',
                     style: TextStyle(
@@ -50,31 +78,37 @@ class ForgetPswd extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 18),
-
-                  // Sign Up button
                   Form(
                     key: _formKey,
                     child: Column(
                       children: [
-                        const PasswordInputField(
-                          label: 'Email ID / Phone number ',
-                          isNewPassword: true,
+                        TextFormField(
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: InputDecoration(
+                            labelText: 'Email ID',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your email';
+                            }
+                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                .hasMatch(value)) {
+                              return 'Please enter a valid email';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 28),
-
-                        // Submit button
                         ElevatedButton(
-                          onPressed: () {
-                            if (_formKey.currentState!.validate()) {
-                              Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const OtpScreen(),
-                                  ));
-
-                              _navigateToOtpScreen(context);
-                            }
-                          },
+                          onPressed: _isLoading ? null : _submitForm,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFE65100),
                             shape: RoundedRectangleBorder(
@@ -82,14 +116,17 @@ class ForgetPswd extends StatelessWidget {
                             ),
                             minimumSize: const Size(double.infinity, 56),
                           ),
-                          child: const Text(
-                            'Submit',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
+                          child: _isLoading
+                              ? const CircularProgressIndicator(
+                                  color: Colors.white)
+                              : const Text(
+                                  'Submit',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
                         ),
                       ],
                     ),
@@ -98,14 +135,12 @@ class ForgetPswd extends StatelessWidget {
               ),
             ),
             Positioned(
-              top: 44, // Moved slightly lower (was 16, now 24)
-              left: 26, // Consistent padding from the left edge
+              top: 44,
+              left: 26,
               child: IconButton(
                 icon: const Icon(Icons.arrow_back),
-                color: const Color(0xFFE65100), // Orange color for the icon
-                onPressed: () {
-                  Navigator.pop(context); // Go back to the previous screen
-                },
+                color: const Color(0xFFE65100),
+                onPressed: () => Navigator.pop(context),
               ),
             ),
           ],

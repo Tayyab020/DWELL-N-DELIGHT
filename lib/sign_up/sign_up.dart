@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter_appp123/Otp/otp_creen.dart';
 import 'package:flutter_appp123/home/screens/home_page.dart';
 import 'package:flutter_appp123/signIn/sign_in.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -25,6 +26,7 @@ class _SignUpScreenState extends State<SignUp> {
   final TextEditingController _passwordController = TextEditingController();
 
   bool _agreedToTerms = false;
+  bool _isLoading = false;
   String _selectedRole = 'buyer'; // default role
   final List<String> _roles = ['buyer', 'provider'];
 
@@ -51,51 +53,59 @@ class _SignUpScreenState extends State<SignUp> {
     }
 
     if (_formKey.currentState?.validate() ?? false) {
-      String name = _nameController.text.trim();
-      String email = _emailController.text.trim();
-      String mobile = _mobileController.text.trim();
-      String password = _passwordController.text.trim();
+      setState(() {
+        _isLoading = true;
+      });
 
-      AuthService authService = AuthService();
-
-      var response = await authService.signUpUser(
-        email: email,
-        password: password,
-        name: name,
-        mobile: mobile,
-        role: _selectedRole,
-      );
-
-      if (response != null && !response.containsKey('error')) {
-        //final prefs = await SharedPreferences.getInstance();
-
-        // Save token and userId
-        // await prefs.setString('token', response['token']);
-        // await prefs.setString('userId', response['userId']);
-
-        Fluttertoast.showToast(
-          msg: "Sign up successful!",
-          toastLength: Toast.LENGTH_SHORT,
-          gravity: ToastGravity.BOTTOM,
-          backgroundColor: Colors.green,
-          textColor: Colors.white,
-          fontSize: 16.0,
+      try {
+        final response = await AuthService().signUpUser(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+          name: _nameController.text.trim(),
+          mobile: _mobileController.text.trim(),
+          role: _selectedRole,
         );
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const SignIn()),
-        );
-      } else {
-        String errorMsg = response?['error'] ?? "Sign up failed!";
+        if (response['success'] == true) {
+          Fluttertoast.showToast(
+            msg: response['message'],
+            toastLength: Toast.LENGTH_LONG,
+            gravity: ToastGravity.BOTTOM,
+            backgroundColor: Colors.green,
+            textColor: Colors.white,
+          );
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OtpScreen(
+                email: _emailController.text.trim(),
+              ),
+            ),
+          );
+        } else {
+          Fluttertoast.showToast(
+            msg: response['error'],
+            toastLength: Toast.LENGTH_LONG,
+            gravity: ToastGravity.BOTTOM,
+            backgroundColor: Colors.red,
+            textColor: Colors.white,
+          );
+        }
+      } catch (e) {
         Fluttertoast.showToast(
-          msg: errorMsg,
-          toastLength: Toast.LENGTH_SHORT,
+          msg: "An error occurred. Please try again.",
+          toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: Colors.red,
           textColor: Colors.white,
-          fontSize: 16.0,
         );
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
   }
@@ -272,7 +282,6 @@ class _SignUpScreenState extends State<SignUp> {
                                 SocialSignUpButton(
                                     icon: 'assets/icons/google.png',
                                     onTap: () {}),
-                              
                                 SocialSignUpButton(
                                     icon: 'assets/icons/facebook.png',
                                     onTap: () {}),

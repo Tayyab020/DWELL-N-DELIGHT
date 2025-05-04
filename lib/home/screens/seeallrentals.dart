@@ -68,11 +68,13 @@ class _AllRentalsPageState extends State<AllRentalsPage> {
           rentalItems = filtered;
           displayedItems = filtered;
         });
+        print("Fetched ${rentalItems} rental items.");
       }
     } catch (e) {
       debugPrint("❌ Error: $e");
     }
   }
+
 
   Future<void> deletePost(String postId) async {
     try {
@@ -146,6 +148,8 @@ class _AllRentalsPageState extends State<AllRentalsPage> {
             .where((item) =>
                 item['title'].toLowerCase().contains(value.toLowerCase()))
             .toList();
+            
+        print("Rental items ➡️➡️➡️➡️➡️➡️➡️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️R: $rentalItems");
       });
     });
   }
@@ -237,6 +241,7 @@ class _AllRentalsPageState extends State<AllRentalsPage> {
                                   price: (item['price'] is num)
                                       ? item['price'].toDouble()
                                       : 0.0,
+                                  authorId: item['author'] ?? 'Unknown',
                                 ),
                               ),
                             );
